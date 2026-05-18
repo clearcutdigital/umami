@@ -18,7 +18,7 @@ import { useApi, useMessages, useUpdateQuery } from '@/components/hooks';
 export function WebsiteMonthlyReportForm({ websiteId }: { websiteId: string }) {
   const [enabled, setEnabled] = useState(false);
   const { get, useQuery } = useApi();
-  const { formatMessage, labels, messages, getErrorMessage } = useMessages();
+  const { t, labels, messages, getErrorMessage } = useMessages();
   const saveQuery = useUpdateQuery(`/websites/${websiteId}/monthly-report`);
   const sendQuery = useUpdateQuery(`/websites/${websiteId}/monthly-report/send`);
   const { data } = useQuery({
@@ -35,7 +35,7 @@ export function WebsiteMonthlyReportForm({ websiteId }: { websiteId: string }) {
       { ...values, enabled },
       {
         onSuccess: async () => {
-          saveQuery.toast(formatMessage(messages.saved));
+          saveQuery.toast(t(messages.saved));
         },
       },
     );
@@ -46,7 +46,7 @@ export function WebsiteMonthlyReportForm({ websiteId }: { websiteId: string }) {
       {},
       {
         onSuccess: async () => {
-          sendQuery.toast(formatMessage(messages.reportSent));
+          sendQuery.toast('Monthly report sent successfully.');
         },
       },
     );
@@ -60,15 +60,15 @@ export function WebsiteMonthlyReportForm({ websiteId }: { websiteId: string }) {
     >
       <Column gap="5">
         <Switch isSelected={enabled} onChange={setEnabled}>
-          {formatMessage(labels.enableMonthlyReports)}
+          Enable monthly reports
         </Switch>
         <FormField
-          label={formatMessage(labels.recipients)}
+          label="Recipients"
           name="recipients"
           rules={{
             validate: value => {
               if (!value?.trim() && enabled) {
-                return formatMessage(labels.required);
+                return t(labels.required);
               }
 
               return true;
@@ -96,17 +96,17 @@ export function WebsiteMonthlyReportForm({ websiteId }: { websiteId: string }) {
         </FormField>
         {data?.lastSentAt && (
           <Column>
-            <Label>{formatMessage(labels.lastSent)}</Label>
+            <Label>Last sent</Label>
             {new Date(data.lastSentAt).toLocaleString()}
           </Column>
         )}
         <FormButtons>
           <Row gap>
             <Button onPress={handleSend} isDisabled={sendQuery.isPending}>
-              {formatMessage(labels.sendNow)}
+              Send now
             </Button>
             <FormSubmitButton variant="primary" isDisabled={saveQuery.isPending}>
-              {formatMessage(labels.save)}
+              {t(labels.save)}
             </FormSubmitButton>
           </Row>
         </FormButtons>

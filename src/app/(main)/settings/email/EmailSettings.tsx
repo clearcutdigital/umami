@@ -15,7 +15,7 @@ import { useApi, useLoginQuery, useMessages, useUpdateQuery } from '@/components
 export function EmailSettings() {
   const { user } = useLoginQuery();
   const { get, useQuery } = useApi();
-  const { formatMessage, labels, messages, getErrorMessage } = useMessages();
+  const { t, labels, messages, getErrorMessage } = useMessages();
   const { mutateAsync, error, isPending, toast } = useUpdateQuery('/settings/email');
   const { data } = useQuery({
     queryKey: ['settings', 'email'],
@@ -30,7 +30,7 @@ export function EmailSettings() {
   const handleSubmit = async (values: any) => {
     await mutateAsync(values, {
       onSuccess: async () => {
-        toast(formatMessage(messages.saved));
+        toast(t(messages.saved));
       },
     });
   };
@@ -44,9 +44,9 @@ export function EmailSettings() {
             <Text color="muted">API key is loaded from `EMAILIT_API_KEY`.</Text>
           ) : (
             <FormField
-              label={formatMessage(labels.apiKey)}
+              label="API key"
               name="apiKey"
-              rules={{ required: formatMessage(labels.required) }}
+              rules={{ required: t(labels.required) }}
             >
               <TextField autoComplete="off" />
             </FormField>
@@ -55,19 +55,19 @@ export function EmailSettings() {
             <Text color="muted">From address is loaded from `EMAILIT_FROM`.</Text>
           ) : (
             <FormField
-              label={formatMessage(labels.fromAddress)}
+              label="From address"
               name="fromAddress"
-              rules={{ required: formatMessage(labels.required) }}
+              rules={{ required: t(labels.required) }}
             >
               <TextField autoComplete="off" />
             </FormField>
           )}
-          <FormField label={formatMessage(labels.replyTo)} name="replyTo">
+          <FormField label="Reply-to" name="replyTo">
             <TextField autoComplete="off" />
           </FormField>
           <FormButtons>
             <FormSubmitButton variant="primary" isDisabled={isPending}>
-              {formatMessage(labels.save)}
+              {t(labels.save)}
             </FormSubmitButton>
           </FormButtons>
         </Form>
