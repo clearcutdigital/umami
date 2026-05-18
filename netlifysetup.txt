@@ -8,7 +8,7 @@ DATABASE_URL=your_database_url
 EMAIL_REPORTS_CRON_SECRET=your_random_secret
 EMAILIT_API_KEY=your_emailit_api_key
 EMAILIT_FROM=Clear Cut Digital <notification@clearcutdigital.com>
-EMAILIT_REPLY_TO=admin@clearcutdigital.com
+EMAILIT_REPLY_TO=your_reply_to_email
 EMAILIT_TRACKING_LOADS=false
 EMAILIT_TRACKING_CLICKS=false
 
