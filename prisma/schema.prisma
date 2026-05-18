@@ -78,11 +78,12 @@ model Website {
   replayEnabled Boolean   @default(false) @map("replay_enabled")
   replayConfig  Json?     @map("replay_config")
 
-  user                User?               @relation("user", fields: [userId], references: [id])
-  createUser          User?               @relation("createUser", fields: [createdBy], references: [id])
-  team                Team?               @relation(fields: [teamId], references: [id])
+  user                User?                 @relation("user", fields: [userId], references: [id])
+  createUser          User?                 @relation("createUser", fields: [createdBy], references: [id])
+  team                Team?                 @relation(fields: [teamId], references: [id])
   eventData           EventData[]
   reports             Report[]
+  monthlyReport       WebsiteMonthlyReport?
   revenue             Revenue[]
   segments            Segment[]
   sessionData         SessionData[]
@@ -248,6 +249,34 @@ model Report {
   @@index([type])
   @@index([name])
   @@map("report")
+}
+
+model EmailSettings {
+  id             String    @id @db.VarChar(50)
+  apiKey         String    @map("api_key") @db.VarChar(255)
+  fromAddress    String    @map("from_address") @db.VarChar(255)
+  replyTo        String?   @map("reply_to") @db.VarChar(255)
+  trackingLoads  Boolean   @default(true) @map("tracking_loads")
+  trackingClicks Boolean   @default(true) @map("tracking_clicks")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("email_settings")
+}
+
+model WebsiteMonthlyReport {
+  websiteId   String    @id @map("website_id") @db.Uuid
+  enabled     Boolean   @default(false)
+  recipients  String    @db.Text
+  subject     String?   @db.VarChar(255)
+  replyTo     String?   @map("reply_to") @db.VarChar(255)
+  lastSentAt  DateTime? @map("last_sent_at") @db.Timestamptz(6)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id])
+
+  @@map("website_monthly_report")
 }
 
 model Segment {

@@ -1,0 +1,74 @@
+Netlify monthly report setup
+
+1. Required environment variables
+
+Add these in Netlify Site configuration > Environment variables:
+
+DATABASE_URL=your_database_url
+EMAIL_REPORTS_CRON_SECRET=your_random_secret
+EMAILIT_API_KEY=your_emailit_api_key
+EMAILIT_FROM=Clear Cut Digital <notification@clearcutdigital.com>
+EMAILIT_REPLY_TO=admin@clearcutdigital.com
+EMAILIT_TRACKING_LOADS=false
+EMAILIT_TRACKING_CLICKS=false
+
+Tracking is disabled by default because Emailit tracking links can introduce domains like emtr.me, which may trigger spam filters.
+
+2. Deploy the site
+
+This project already has `netlify.toml` configured for Next.js with `@netlify/plugin-nextjs`.
+
+3. Configure the monthly trigger
+
+This project includes a Netlify scheduled function at `netlify/functions/monthly-reports-cron.ts`.
+It runs hourly from 12:00-23:00 UTC on the first 3 days of each month and calls:
+
+POST /api/cron/monthly-reports
+
+The app decides which sites are due based on America/New_York.
+
+The app now staggers enabled websites in deterministic 10-minute slots starting on the 1st of the month at 8:00 AM Eastern.
+
+Examples:
+
+- first eligible site: 8:00 AM ET
+- second eligible site: 8:10 AM ET
+- third eligible site: 8:20 AM ET
+
+If a run is missed, the next run catches up overdue unsent sites.
+
+4. Secure the cron request
+
+Call this endpoint with the cron secret:
+
+POST /api/cron/monthly-reports
+Authorization: Bearer YOUR_EMAIL_REPORTS_CRON_SECRET
+
+5. Optional external scheduler request
+
+curl -X POST https://your-site.netlify.app/api/cron/monthly-reports \
+  -H "Authorization: Bearer YOUR_EMAIL_REPORTS_CRON_SECRET"
+
+6. Monthly report behavior
+
+- manual `Send now` sends the previous calendar month immediately
+- scheduled sends also send the previous calendar month
+- each website sends at most once per month
+- sites are ordered by websiteId for deterministic staggering
+
+7. Report notes
+
+- Average visit duration = total visit time / visits
+- Top US Cities is based on IP-derived geolocation, so it is only a general overview
+- Sources includes referrer, visitors, share, and a More row for lower-volume sources
+
+8. Email deliverability note
+
+If forwarding or receiving systems reject the email because of a URL like `emtr.me`, that is usually caused by email tracking/rewrite links from the provider.
+
+This project disables Emailit open/click tracking by default with:
+
+EMAILIT_TRACKING_LOADS=false
+EMAILIT_TRACKING_CLICKS=false
+
+If you re-enable tracking later, deliverability may worsen depending on recipient mail filters.

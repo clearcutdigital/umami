@@ -44,7 +44,13 @@ Create an `.env` file with the following:
 
 ```bash
 DATABASE_URL=connection-url
+# Optional: protects the monthly report cron endpoint
+EMAIL_REPORTS_CRON_SECRET=change-me
 ```
+
+Optional Emailit settings can be configured in the app under `Settings > Email`. The cron secret is used to secure the monthly report endpoint at `POST /api/cron/monthly-reports`.
+
+For monthly report scheduling on Netlify, hit `POST /api/cron/monthly-reports` hourly from 12:00-23:00 UTC on the first 3 days of each month with the cron secret. The app will stagger enabled websites in deterministic 10-minute slots starting at 8:00 AM `America/New_York` on the 1st of the month, and it will catch up missed slots on the next run.
 
 The connection URL format:
 

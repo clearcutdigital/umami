@@ -219,6 +219,10 @@ export async function deleteWebsite(websiteId: string) {
         where: { websiteId },
       });
 
+      await tx.websiteMonthlyReport.deleteMany({
+        where: { websiteId },
+      });
+
       await tx.report.deleteMany({
         where: { websiteId },
       });
