@@ -52,7 +52,7 @@ export function EmailSettings() {
             </FormField>
           )}
           {data?.fromAddressFromEnv ? (
-            <Text color="muted">From address is loaded from `EMAILIT_FROM`.</Text>
+            <Text color="muted">From address is fixed at {data.fromAddress}.</Text>
           ) : (
             <FormField
               label="From address"

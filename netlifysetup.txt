@@ -7,10 +7,11 @@ Add these in Netlify Site configuration > Environment variables:
 DATABASE_URL=your_database_url
 EMAIL_REPORTS_CRON_SECRET=your_random_secret
 EMAILIT_API_KEY=your_emailit_api_key
-EMAILIT_FROM=Clear Cut Digital <notification@clearcutdigital.com>
 EMAILIT_REPLY_TO=your_reply_to_email
 EMAILIT_TRACKING_LOADS=false
 EMAILIT_TRACKING_CLICKS=false
+
+The Emailit sender is hardcoded in the app as analytics@forms.clearcutdigital.com.
 
 Tracking is disabled by default because Emailit tracking links can introduce domains like emtr.me, which may trigger spam filters.
 

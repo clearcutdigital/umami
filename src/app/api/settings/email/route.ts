@@ -3,6 +3,8 @@ import { parseRequest } from '@/lib/request';
 import { badRequest, forbidden, json } from '@/lib/response';
 import { getEmailSettings, upsertEmailSettings } from '@/queries/prisma';
 
+const EMAILIT_FROM_ADDRESS = 'analytics@forms.clearcutdigital.com';
+
 export async function GET(request: Request) {
   const { auth, error } = await parseRequest(request);
 
@@ -16,14 +18,13 @@ export async function GET(request: Request) {
 
   const settings = await getEmailSettings();
   const envApiKey = process.env.EMAILIT_API_KEY;
-  const envFromAddress = process.env.EMAILIT_FROM;
 
   return json({
     apiKey: envApiKey ? '' : settings?.apiKey || '',
     apiKeyConfigured: !!(envApiKey || settings?.apiKey),
     apiKeyFromEnv: !!envApiKey,
-    fromAddress: envFromAddress || settings?.fromAddress || '',
-    fromAddressFromEnv: !!envFromAddress,
+    fromAddress: EMAILIT_FROM_ADDRESS,
+    fromAddressFromEnv: true,
     replyTo: settings?.replyTo || '',
     trackingLoads: settings?.trackingLoads ?? true,
     trackingClicks: settings?.trackingClicks ?? true,
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const schema = z.object({
     apiKey: z.string().trim().optional().or(z.literal('')),
-    fromAddress: z.string().trim().min(1),
+    fromAddress: z.string().trim().optional().or(z.literal('')),
     replyTo: z.string().trim().optional().or(z.literal('')),
     trackingLoads: z.boolean().default(true),
     trackingClicks: z.boolean().default(true),
@@ -50,16 +51,11 @@ export async function POST(request: Request) {
 
   const settings = await getEmailSettings();
   const envApiKey = process.env.EMAILIT_API_KEY;
-  const envFromAddress = process.env.EMAILIT_FROM;
   const apiKey = envApiKey ? settings?.apiKey || '[ENV]' : body.apiKey || settings?.apiKey;
-  const fromAddress = envFromAddress || body.fromAddress || settings?.fromAddress;
+  const fromAddress = EMAILIT_FROM_ADDRESS;
 
   if (!apiKey) {
     return badRequest({ message: 'API key is required.' });
-  }
-
-  if (!fromAddress) {
-    return badRequest({ message: 'From address is required.' });
   }
 
   const result = await upsertEmailSettings({

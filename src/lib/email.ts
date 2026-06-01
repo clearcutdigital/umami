@@ -10,6 +10,7 @@ function parseBoolean(value: string | undefined, fallback: boolean) {
 }
 
 const emailSchema = z.string().email();
+const EMAILIT_FROM_ADDRESS = 'analytics@forms.clearcutdigital.com';
 
 export function parseRecipientList(input: string) {
   const recipients = input
@@ -48,7 +49,7 @@ export async function sendEmailitEmail(data: {
 }) {
   const settings = await getEmailSettings();
   const apiKey = process.env.EMAILIT_API_KEY || settings?.apiKey;
-  const fromAddress = process.env.EMAILIT_FROM || settings?.fromAddress;
+  const fromAddress = EMAILIT_FROM_ADDRESS;
   const defaultReplyTo = process.env.EMAILIT_REPLY_TO || settings?.replyTo;
   const trackingLoads = parseBoolean(
     process.env.EMAILIT_TRACKING_LOADS,
@@ -61,7 +62,7 @@ export async function sendEmailitEmail(data: {
   const tracking =
     trackingLoads || trackingClicks ? { loads: trackingLoads, clicks: trackingClicks } : false;
 
-  if (!apiKey || !fromAddress) {
+  if (!apiKey) {
     throw new Error('Email delivery is not configured.');
   }
 
