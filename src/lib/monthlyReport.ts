@@ -15,8 +15,8 @@ import {
 import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/queries/sql';
 
 const REPORT_TIMEZONE = 'America/New_York';
-const REPORT_START_HOUR = 11;
-const REPORT_START_MINUTE = 40;
+const REPORT_START_HOUR = 8;
+const REPORT_START_MINUTE = 0;
 const REPORT_SLOT_MINUTES = 10;
 
 function getMonthlyReportUnsubscribeSecret() {
