@@ -294,11 +294,10 @@ export async function sendWebsiteMonthlyReport(
   const filters = { startDate, endDate };
   const usFilters = { ...filters, country: 'US' };
 
-  const [stats, sources, pages, states, cities] = await Promise.all([
+  const [stats, sources, pages, cities] = await Promise.all([
     getWebsiteStats(websiteId, filters),
     getPageviewMetrics(websiteId, { type: 'referrer', limit: 25 }, filters),
     getPageviewMetrics(websiteId, { type: 'path', limit: 5 }, filters),
-    getSessionMetrics(websiteId, { type: 'region', limit: 5 }, usFilters),
     getSessionMetrics(websiteId, { type: 'city', limit: 5 }, usFilters),
   ]);
   const totals = stats
@@ -312,7 +311,6 @@ export async function sendWebsiteMonthlyReport(
     : { visitors: 0, visits: 0, pageviews: 0, bounces: 0, totaltime: 0 };
   const topSources = summarizeSources(normalizeMetricRows(sources));
   const topPages = normalizeMetricRows(pages);
-  const topStates = normalizeMetricRows(states);
   const topCities = normalizeMetricRows(cities);
 
   const visits = totals.visits || 0;
@@ -354,16 +352,10 @@ export async function sendWebsiteMonthlyReport(
             <ul style="list-style:none; margin:0; padding:0;">${renderList(topPages)}</ul>
           </div>
 
-          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:24px;">
-            <div style="border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
-              <h2 style="margin:0 0 12px; font-size:18px;">Top US States</h2>
-              <ul style="list-style:none; margin:0; padding:0;">${renderList(topStates)}</ul>
-            </div>
-            <div style="border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
-              <h2 style="margin:0 0 12px; font-size:18px;">Top US Cities</h2>
-              <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">Based on IP-derived geolocation, so this is a general overview and won&apos;t be fully accurate.</p>
-              <ul style="list-style:none; margin:0; padding:0;">${renderList(topCities)}</ul>
-            </div>
+          <div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
+            <h2 style="margin:0 0 12px; font-size:18px;">Top US Cities</h2>
+            <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">Based on IP-derived geolocation, so this is a general overview and won&apos;t be fully accurate.</p>
+            <ul style="list-style:none; margin:0; padding:0;">${renderList(topCities)}</ul>
           </div>
         </div>
         {{unsubscribeHtml}}
@@ -386,9 +378,6 @@ export async function sendWebsiteMonthlyReport(
     '',
     'Top pages',
     renderTextList(topPages),
-    '',
-    'Top US states',
-    renderTextList(topStates),
     '',
     'Top US cities',
     'Based on IP-derived geolocation, so this is a general overview and will not be fully accurate.',
