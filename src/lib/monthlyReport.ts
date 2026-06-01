@@ -15,7 +15,8 @@ import {
 import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/queries/sql';
 
 const REPORT_TIMEZONE = 'America/New_York';
-const REPORT_START_HOUR = 8;
+const REPORT_START_HOUR = 11;
+const REPORT_START_MINUTE = 30;
 const REPORT_SLOT_MINUTES = 10;
 
 function getMonthlyReportUnsubscribeSecret() {
@@ -170,8 +171,10 @@ function getTimezoneParts(date: Date, timeZone: string) {
 
 function getMonthlyReportSchedule(referenceDate = new Date()) {
   const local = getTimezoneParts(referenceDate, REPORT_TIMEZONE);
+  const startMinuteOfDay = REPORT_START_HOUR * 60 + REPORT_START_MINUTE;
+  const currentMinuteOfDay = local.hour * 60 + local.minute;
   const minutesSinceStart =
-    (local.day - 1) * 24 * 60 + (local.hour - REPORT_START_HOUR) * 60 + local.minute;
+    (local.day - 1) * 24 * 60 + currentMinuteOfDay - startMinuteOfDay;
 
   return {
     timeZone: REPORT_TIMEZONE,
@@ -181,6 +184,7 @@ function getMonthlyReportSchedule(referenceDate = new Date()) {
     slotIndex: minutesSinceStart >= 0 ? Math.floor(minutesSinceStart / REPORT_SLOT_MINUTES) : -1,
     slotMinutes: REPORT_SLOT_MINUTES,
     startHour: REPORT_START_HOUR,
+    startMinute: REPORT_START_MINUTE,
   };
 }
 
