@@ -16,7 +16,7 @@ import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/querie
 
 const REPORT_TIMEZONE = 'America/New_York';
 const REPORT_START_HOUR = 11;
-const REPORT_START_MINUTE = 30;
+const REPORT_START_MINUTE = 40;
 const REPORT_SLOT_MINUTES = 10;
 
 function getMonthlyReportUnsubscribeSecret() {
