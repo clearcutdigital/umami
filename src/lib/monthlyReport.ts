@@ -1,11 +1,15 @@
+import crypto from 'node:crypto';
 import { endOfMonth, startOfMonth, subMonths } from 'date-fns';
+import { secret } from '@/lib/crypto';
 import { formatDate } from '@/lib/date';
 import { escapeHtml, sendEmailitEmail, validateRecipientList } from '@/lib/email';
 import { formatLongNumber, formatShortTime } from '@/lib/format';
 import {
+  getEnabledMonthlyReportRecipients,
   getEnabledWebsiteMonthlyReports,
   getWebsite,
   getWebsiteMonthlyReport,
+  syncWebsiteMonthlyReportRecipients,
   updateWebsiteMonthlyReport,
 } from '@/queries/prisma';
 import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/queries/sql';
@@ -13,6 +17,111 @@ import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/querie
 const REPORT_TIMEZONE = 'America/New_York';
 const REPORT_START_HOUR = 8;
 const REPORT_SLOT_MINUTES = 10;
+
+function getMonthlyReportUnsubscribeSecret() {
+  return process.env.MONTHLY_REPORT_UNSUBSCRIBE_SECRET || secret();
+}
+
+function signMonthlyReportUnsubscribePayload(websiteId: string, email: string) {
+  return crypto
+    .createHmac('sha256', getMonthlyReportUnsubscribeSecret())
+    .update(`${websiteId}:${email.trim().toLowerCase()}`)
+    .digest('hex');
+}
+
+export function createMonthlyReportUnsubscribeToken(websiteId: string, email: string) {
+  const payload = {
+    websiteId,
+    email: email.trim().toLowerCase(),
+    signature: signMonthlyReportUnsubscribePayload(websiteId, email),
+  };
+
+  return Buffer.from(JSON.stringify(payload)).toString('base64url');
+}
+
+export function verifyMonthlyReportUnsubscribeToken(token: string) {
+  const payload = JSON.parse(Buffer.from(token, 'base64url').toString('utf8')) as {
+    websiteId?: string;
+    email?: string;
+    signature?: string;
+  };
+
+  if (!payload.websiteId || !payload.email || !payload.signature) {
+    throw new Error('Invalid unsubscribe token.');
+  }
+
+  const expected = signMonthlyReportUnsubscribePayload(payload.websiteId, payload.email);
+
+  if (payload.signature.length !== expected.length) {
+    throw new Error('Invalid unsubscribe token.');
+  }
+
+  const valid = crypto.timingSafeEqual(Buffer.from(payload.signature), Buffer.from(expected));
+
+  if (!valid) {
+    throw new Error('Invalid unsubscribe token.');
+  }
+
+  return {
+    websiteId: payload.websiteId,
+    email: payload.email,
+  };
+}
+
+function getUnsubscribeBaseUrl() {
+  const value =
+    process.env.MONTHLY_REPORT_UNSUBSCRIBE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    process.env.SITE_URL ||
+    process.env.URL ||
+    process.env.DEPLOY_URL ||
+    process.env.VERCEL_URL;
+
+  if (!value) {
+    return null;
+  }
+
+  return value.startsWith('http') ? value : `https://${value}`;
+}
+
+function getMonthlyReportUnsubscribeUrl(websiteId: string, email: string) {
+  const baseUrl = getUnsubscribeBaseUrl();
+
+  if (!baseUrl) {
+    return null;
+  }
+
+  const url = new URL('/api/monthly-report/unsubscribe', baseUrl);
+  url.searchParams.set('token', createMonthlyReportUnsubscribeToken(websiteId, email));
+
+  return url.toString();
+}
+
+function renderUnsubscribeHtml(websiteId: string, email: string) {
+  const unsubscribeUrl = getMonthlyReportUnsubscribeUrl(websiteId, email);
+
+  if (!unsubscribeUrl) {
+    return '';
+  }
+
+  return `
+    <div style="padding:0 24px 28px; text-align:center; color:#64748b; font-size:12px; line-height:1.5;">
+      You are receiving this monthly analytics report at ${escapeHtml(email)}.
+      <a href="${escapeHtml(unsubscribeUrl)}" style="color:#2563eb; text-decoration:underline;">Unsubscribe</a>
+    </div>
+  `;
+}
+
+function renderUnsubscribeText(websiteId: string, email: string) {
+  const unsubscribeUrl = getMonthlyReportUnsubscribeUrl(websiteId, email);
+
+  if (!unsubscribeUrl) {
+    return '';
+  }
+
+  return `\n\nUnsubscribe from this monthly analytics report: ${unsubscribeUrl}`;
+}
 
 function toNumber(value: number | bigint | null | undefined) {
   return typeof value === 'bigint' ? Number(value) : Number(value || 0);
@@ -166,6 +275,12 @@ export async function sendWebsiteMonthlyReport(
   }
 
   const recipients = validateRecipientList(monthlyReport.recipients);
+  await syncWebsiteMonthlyReportRecipients(websiteId, recipients);
+  const activeRecipients = await getEnabledMonthlyReportRecipients(websiteId, recipients);
+
+  if (!activeRecipients.length) {
+    throw new Error('No monthly report recipients are subscribed.');
+  }
   const { startDate, endDate, label } = getMonthlyDateRange(referenceDate);
   const filters = { startDate, endDate };
   const usFilters = { ...filters, country: 'US' };
@@ -242,6 +357,7 @@ export async function sendWebsiteMonthlyReport(
             </div>
           </div>
         </div>
+        {{unsubscribeHtml}}
       </div>
     </div>
   `;
@@ -270,22 +386,28 @@ export async function sendWebsiteMonthlyReport(
     renderTextList(topCities),
   ].join('\n');
 
-  const result = await sendEmailitEmail({
-    to: recipients,
-    subject,
-    html,
-    text,
-    replyTo: monthlyReport.replyTo,
-    meta: {
-      type: 'monthly-report',
-      websiteId,
-      period: label,
-    },
-  });
+  const results = [];
+
+  for (const recipient of activeRecipients) {
+    const result = await sendEmailitEmail({
+      to: [recipient],
+      subject,
+      html: html.replace('{{unsubscribeHtml}}', renderUnsubscribeHtml(websiteId, recipient)),
+      text: `${text}${renderUnsubscribeText(websiteId, recipient)}`,
+      replyTo: monthlyReport.replyTo,
+      meta: {
+        type: 'monthly-report',
+        websiteId,
+        period: label,
+      },
+    });
+
+    results.push({ recipient, result });
+  }
 
   await updateWebsiteMonthlyReport(websiteId, { lastSentAt: new Date() });
 
-  return result;
+  return { count: results.length, results };
 }
 
 export async function sendDueMonthlyReports(referenceDate = new Date()) {
@@ -305,9 +427,9 @@ export async function sendDueMonthlyReports(referenceDate = new Date()) {
   }
 
   const orderedReports = [...reports].sort((a, b) => a.websiteId.localeCompare(b.websiteId));
-  const dueReports = orderedReports.filter((report, index) => index <= schedule.slotIndex);
+  const dueReports = orderedReports.filter((_report, index) => index <= schedule.slotIndex);
   const skipped = orderedReports
-    .filter((report, index) => index > schedule.slotIndex)
+    .filter((_report, index) => index > schedule.slotIndex)
     .map((report, index) => ({
       websiteId: report.websiteId,
       websiteName: report.website.name,
@@ -333,7 +455,7 @@ export async function sendDueMonthlyReports(referenceDate = new Date()) {
         websiteId: report.websiteId,
         websiteName: report.website.name,
         slot: index,
-        emailId: result?.id,
+        emailCount: result.count,
       });
     } catch (error: any) {
       failed.push({

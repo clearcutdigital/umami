@@ -3,7 +3,11 @@ import { validateRecipientList } from '@/lib/email';
 import { parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { canUpdateWebsite, canViewWebsite } from '@/permissions';
-import { getWebsiteMonthlyReport, upsertWebsiteMonthlyReport } from '@/queries/prisma';
+import {
+  getWebsiteMonthlyReport,
+  syncWebsiteMonthlyReportRecipients,
+  upsertWebsiteMonthlyReport,
+} from '@/queries/prisma';
 
 export async function GET(
   request: Request,
@@ -50,18 +54,25 @@ export async function POST(
     return unauthorized();
   }
 
+  let recipients: string[] = [];
+
   try {
-    if (body.enabled) {
+    if (body.recipients) {
+      recipients = validateRecipientList(body.recipients);
+    }
+
+    if (body.enabled && !recipients.length) {
       validateRecipientList(body.recipients);
     }
   } catch (error: any) {
     return badRequest({ message: error.message });
   }
-
   const result = await upsertWebsiteMonthlyReport(websiteId, {
     enabled: body.enabled,
     recipients: body.recipients,
   });
+
+  await syncWebsiteMonthlyReportRecipients(websiteId, recipients);
 
   return json(result);
 }

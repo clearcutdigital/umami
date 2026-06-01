@@ -84,6 +84,7 @@ model Website {
   eventData           EventData[]
   reports             Report[]
   monthlyReport       WebsiteMonthlyReport?
+  monthlyReportRecipients WebsiteMonthlyReportRecipient[]
   revenue             Revenue[]
   segments            Segment[]
   sessionData         SessionData[]
@@ -277,6 +278,20 @@ model WebsiteMonthlyReport {
   website Website @relation(fields: [websiteId], references: [id])
 
   @@map("website_monthly_report")
+}
+
+model WebsiteMonthlyReportRecipient {
+  websiteId String    @map("website_id") @db.Uuid
+  email     String    @db.VarChar(255)
+  send      Boolean   @default(true)
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id])
+
+  @@id([websiteId, email])
+  @@index([send])
+  @@map("website_monthly_report_recipient")
 }
 
 model Segment {
