@@ -12,7 +12,15 @@ import {
   syncWebsiteMonthlyReportRecipients,
   updateWebsiteMonthlyReport,
 } from '@/queries/prisma';
-import { getPageviewMetrics, getSessionMetrics, getWebsiteStats } from '@/queries/sql';
+import {
+  type ContactLinkEvent,
+  EMAIL_LINK_CLICK_EVENT,
+  getContactLinkEvents,
+  getEventMetrics,
+  getPageviewMetrics,
+  getWebsiteStats,
+  PHONE_LINK_CLICK_EVENT,
+} from '@/queries/sql';
 
 const REPORT_TIMEZONE = 'America/New_York';
 const REPORT_START_HOUR = 8;
@@ -178,8 +186,7 @@ function getMonthlyReportSchedule(referenceDate = new Date()) {
   const local = getTimezoneParts(referenceDate, REPORT_TIMEZONE);
   const startMinuteOfDay = REPORT_START_HOUR * 60 + REPORT_START_MINUTE;
   const currentMinuteOfDay = local.hour * 60 + local.minute;
-  const minutesSinceStart =
-    (local.day - 1) * 24 * 60 + currentMinuteOfDay - startMinuteOfDay;
+  const minutesSinceStart = (local.day - 1) * 24 * 60 + currentMinuteOfDay - startMinuteOfDay;
 
   return {
     timeZone: REPORT_TIMEZONE,
@@ -261,6 +268,86 @@ function renderSourceTextList(items: { x: string; y: number }[], totalVisitors: 
     .join('\n');
 }
 
+function getContactType(item: ContactLinkEvent) {
+  if (item.contactType === 'phone' || item.eventName === PHONE_LINK_CLICK_EVENT) {
+    return 'phone';
+  }
+
+  if (item.contactType === 'email' || item.eventName === EMAIL_LINK_CLICK_EVENT) {
+    return 'email';
+  }
+
+  return 'contact';
+}
+
+function getContactLabel(item: ContactLinkEvent) {
+  const type = getContactType(item);
+  return type === 'phone' ? 'Phone' : type === 'email' ? 'Email' : 'Contact';
+}
+
+function getContactEventTime(item: ContactLinkEvent) {
+  const clickedAt = item.clickedAt ? new Date(item.clickedAt) : null;
+
+  if (clickedAt && clickedAt.getFullYear() > 2000) {
+    return clickedAt;
+  }
+
+  return new Date(item.createdAt);
+}
+
+function formatReportDateTime(date: Date) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: REPORT_TIMEZONE,
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  }).format(date);
+}
+
+function renderContactList(items: ContactLinkEvent[]) {
+  if (!items.length) {
+    return '<li style="padding: 10px 0; color:#64748b;">No phone or email clicks recorded.</li>';
+  }
+
+  return items
+    .map((item, index) => {
+      const label = getContactLabel(item);
+      const value = item.contactValue || item.linkText || item.linkHref || label;
+      const time = formatReportDateTime(getContactEventTime(item));
+      const page = item.urlPath ? ` on ${item.urlPath}` : '';
+
+      return `
+        <li style="padding:12px 0; border-top:${index === 0 ? '0' : '1px solid #e2e8f0'};">
+          <div style="display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:12px; align-items:center;">
+            <strong style="color:#0f172a; font-weight:600; white-space:nowrap;">${escapeHtml(label)}</strong>
+            <span style="color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(value)}${escapeHtml(page)}</span>
+            <span style="color:#64748b; white-space:nowrap;">${escapeHtml(time)}</span>
+          </div>
+        </li>
+      `;
+    })
+    .join('');
+}
+
+function renderContactTextList(items: ContactLinkEvent[]) {
+  if (!items.length) {
+    return '- No phone or email clicks recorded.';
+  }
+
+  return items
+    .map(item => {
+      const label = getContactLabel(item);
+      const value = item.contactValue || item.linkText || item.linkHref || label;
+      const time = formatReportDateTime(getContactEventTime(item));
+      const page = item.urlPath ? ` on ${item.urlPath}` : '';
+
+      return `- ${label}: ${value}${page} at ${time}`;
+    })
+    .join('\n');
+}
+
 export async function sendWebsiteMonthlyReport(
   websiteId: string,
   referenceDate = new Date(),
@@ -292,13 +379,13 @@ export async function sendWebsiteMonthlyReport(
   }
   const { startDate, endDate, label } = getMonthlyDateRange(referenceDate);
   const filters = { startDate, endDate };
-  const usFilters = { ...filters, country: 'US' };
 
-  const [stats, sources, pages, cities] = await Promise.all([
+  const [stats, sources, pages, eventMetrics, contactEvents] = await Promise.all([
     getWebsiteStats(websiteId, filters),
     getPageviewMetrics(websiteId, { type: 'referrer', limit: 25 }, filters),
     getPageviewMetrics(websiteId, { type: 'path', limit: 5 }, filters),
-    getSessionMetrics(websiteId, { type: 'city', limit: 5 }, usFilters),
+    getEventMetrics(websiteId, { type: 'event', limit: '500' }, filters),
+    getContactLinkEvents(websiteId, filters, 50),
   ]);
   const totals = stats
     ? {
@@ -311,7 +398,10 @@ export async function sendWebsiteMonthlyReport(
     : { visitors: 0, visits: 0, pageviews: 0, bounces: 0, totaltime: 0 };
   const topSources = summarizeSources(normalizeMetricRows(sources));
   const topPages = normalizeMetricRows(pages);
-  const topCities = normalizeMetricRows(cities);
+  const contactMetrics = normalizeMetricRows(eventMetrics);
+  const phoneClicks = contactMetrics.find(({ x }) => x === PHONE_LINK_CLICK_EVENT)?.y || 0;
+  const emailClicks = contactMetrics.find(({ x }) => x === EMAIL_LINK_CLICK_EVENT)?.y || 0;
+  const hasContactClicks = phoneClicks > 0 || emailClicks > 0;
 
   const visits = totals.visits || 0;
   const bounceRate = visits ? Math.round((Math.min(visits, totals.bounces) / visits) * 100) : 0;
@@ -335,6 +425,8 @@ export async function sendWebsiteMonthlyReport(
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Pageviews</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(totals.pageviews || 0)}</div></div>
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Bounce Rate</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${bounceRate}%</div></div>
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Average Visit Duration</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${visitDuration}</div></div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Phone Clicks</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(phoneClicks)}</div></div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Email Clicks</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(emailClicks)}</div></div>
           </div>
 
           <div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
@@ -347,15 +439,19 @@ export async function sendWebsiteMonthlyReport(
             <ul style="list-style:none; margin:0; padding:0;">${renderSourceList(topSources, totals.visitors)}</ul>
           </div>
 
+          ${
+            hasContactClicks
+              ? `<div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
+            <h2 style="margin:0 0 4px; font-size:18px;">Phone &amp; Email Clicks</h2>
+            <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">These are clicks on phone and email links/buttons, not confirmed connected calls or sent emails. Showing latest ${contactEvents.length}.</p>
+            <ul style="list-style:none; margin:0; padding:0;">${renderContactList(contactEvents)}</ul>
+          </div>`
+              : ''
+          }
+
           <div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
             <h2 style="margin:0 0 12px; font-size:18px;">Top Pages</h2>
             <ul style="list-style:none; margin:0; padding:0;">${renderList(topPages)}</ul>
-          </div>
-
-          <div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
-            <h2 style="margin:0 0 12px; font-size:18px;">Top US Cities</h2>
-            <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">Based on IP-derived geolocation, so this is a general overview and won&apos;t be fully accurate.</p>
-            <ul style="list-style:none; margin:0; padding:0;">${renderList(topCities)}</ul>
           </div>
         </div>
         {{unsubscribeHtml}}
@@ -372,16 +468,22 @@ export async function sendWebsiteMonthlyReport(
     `Pageviews: ${formatLongNumber(totals.pageviews || 0)}`,
     `Bounce rate: ${bounceRate}%`,
     `Average visit duration: ${visitDuration}`,
+    `Phone clicks: ${formatLongNumber(phoneClicks)}`,
+    `Email clicks: ${formatLongNumber(emailClicks)}`,
     '',
+    ...(hasContactClicks
+      ? [
+          'Phone & email clicks',
+          'These are clicks on phone and email links/buttons, not confirmed connected calls or sent emails.',
+          renderContactTextList(contactEvents),
+          '',
+        ]
+      : []),
     'Sources',
     renderSourceTextList(topSources, totals.visitors),
     '',
     'Top pages',
     renderTextList(topPages),
-    '',
-    'Top US cities',
-    'Based on IP-derived geolocation, so this is a general overview and will not be fully accurate.',
-    renderTextList(topCities),
   ].join('\n');
 
   const results = [];

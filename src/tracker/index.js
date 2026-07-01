@@ -109,6 +109,50 @@
   };
 
   const handleClicks = () => {
+    const getText = el => (el.textContent || el.getAttribute('aria-label') || '').trim();
+    const decode = value => {
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        return value;
+      }
+    };
+
+    const getContactClick = el => {
+      if (el.tagName !== 'A') return;
+
+      const linkHref = (el.getAttribute('href') || '').trim();
+      const lowerHref = linkHref.toLowerCase();
+      const contactProtocol = lowerHref.startsWith('tel:')
+        ? 'tel'
+        : lowerHref.startsWith('sms:')
+          ? 'sms'
+          : lowerHref.startsWith('mailto:')
+            ? 'mailto'
+            : undefined;
+      const contactType =
+        contactProtocol === 'mailto' ? 'email' : contactProtocol ? 'phone' : undefined;
+
+      if (!contactType) return;
+
+      const contactValue = linkHref
+        .slice(linkHref.indexOf(':') + 1)
+        .split('?')[0]
+        .trim();
+
+      return {
+        name: contactType === 'phone' ? 'Phone Link Click' : 'Email Link Click',
+        data: {
+          contactType,
+          contactProtocol,
+          contactValue: decode(contactValue),
+          linkHref,
+          linkText: getText(el).substring(0, 500),
+          clickedAt: new Date().toISOString(),
+        },
+      };
+    };
+
     const trackElement = async el => {
       const eventName = el.getAttribute(eventNameAttribute);
       if (eventName) {
@@ -121,6 +165,12 @@
 
         return track(eventName, eventData);
       }
+
+      const contactClick = getContactClick(el);
+
+      if (contactClick) {
+        return track(contactClick.name, contactClick.data);
+      }
     };
     const onClick = async e => {
       const el = e.target;
@@ -128,7 +178,9 @@
       if (!parentElement) return trackElement(el);
 
       const { href, target } = parentElement;
-      if (!parentElement.getAttribute(eventNameAttribute)) return;
+      const shouldTrack =
+        parentElement.getAttribute(eventNameAttribute) || getContactClick(parentElement);
+      if (!shouldTrack) return;
 
       if (parentElement.tagName === 'BUTTON') {
         return trackElement(parentElement);
