@@ -25,6 +25,11 @@ export default async function handler() {
   });
   const body = await response.text();
 
+  console.log('monthly-reports-cron', {
+    status: response.status,
+    body,
+  });
+
   return new Response(body, {
     status: response.status,
     headers: {
