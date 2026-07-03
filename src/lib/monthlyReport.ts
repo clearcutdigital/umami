@@ -26,11 +26,6 @@ const REPORT_TIMEZONE = 'America/New_York';
 const REPORT_START_HOUR = 8;
 const REPORT_START_MINUTE = 0;
 const REPORT_SLOT_MINUTES = 10;
-const REPORT_SEND_DELAY_MS = 60_000;
-
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 function getMonthlyReportUnsubscribeSecret() {
   return process.env.MONTHLY_REPORT_UNSUBSCRIBE_SECRET || secret();
@@ -537,7 +532,7 @@ export async function sendDueMonthlyReports(referenceDate = new Date()) {
       reason: 'scheduled-later',
     }));
 
-  let sentAttemptCount = 0;
+  let attemptedReport = false;
 
   for (const [index, report] of dueReports.entries()) {
     if (report.lastSentAt && report.lastSentAt >= currentMonthStart) {
@@ -550,12 +545,18 @@ export async function sendDueMonthlyReports(referenceDate = new Date()) {
       continue;
     }
 
-    try {
-      if (sentAttemptCount > 0) {
-        await sleep(REPORT_SEND_DELAY_MS);
-      }
+    if (attemptedReport) {
+      skipped.push({
+        websiteId: report.websiteId,
+        websiteName: report.website.name,
+        slot: index,
+        reason: 'waiting-for-next-run',
+      });
+      continue;
+    }
 
-      sentAttemptCount += 1;
+    try {
+      attemptedReport = true;
       const result = await sendWebsiteMonthlyReport(report.websiteId, referenceDate);
 
       sent.push({
