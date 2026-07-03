@@ -22,7 +22,7 @@ This project already has `netlify.toml` configured for Next.js with `@netlify/pl
 3. Configure the monthly trigger
 
 This project includes a Netlify scheduled function at `netlify/functions/monthly-reports-cron.ts`.
-It runs hourly from 12:00-23:00 UTC on the first 3 days of each month and calls:
+It runs every 30 minutes from 12:00-23:30 UTC on the first 3 days of each month and calls:
 
 POST /api/cron/monthly-reports
 
