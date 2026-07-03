@@ -22,19 +22,19 @@ This project already has `netlify.toml` configured for Next.js with `@netlify/pl
 3. Configure the monthly trigger
 
 This project includes a Netlify scheduled function at `netlify/functions/monthly-reports-cron.ts`.
-It runs every 30 minutes from 12:00-23:30 UTC on the first 3 days of each month and calls:
+It runs every 20 minutes from 11:00-23:40 UTC, plus 00:00 UTC for the 8:00 PM ET run on the first 3 days of each month and calls:
 
 POST /api/cron/monthly-reports
 
 The app decides which sites are due based on America/New_York.
 
-The app now staggers enabled websites in deterministic 10-minute slots starting on the 1st of the month at 8:00 AM Eastern.
+The app now staggers enabled websites in deterministic 10-minute slots starting on the 1st of the month at 7:00 AM Eastern.
 
 Examples:
 
-- first eligible site: 8:00 AM ET
-- second eligible site: 8:10 AM ET
-- third eligible site: 8:20 AM ET
+- first eligible site: 7:00 AM ET
+- second eligible site: 7:10 AM ET
+- third eligible site: 7:20 AM ET
 
 If a run is missed, the next run catches up overdue unsent sites.
 
