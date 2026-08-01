@@ -6,6 +6,7 @@ import type { QueryFilters } from '@/lib/types';
 const FUNCTION_NAME = 'getContactLinkEvents';
 export const PHONE_LINK_CLICK_EVENT = 'Phone Link Click';
 export const EMAIL_LINK_CLICK_EVENT = 'Email Link Click';
+export const CONTACT_FORM_SUBMISSION_EVENT = 'Contact Form Submission';
 
 export interface ContactLinkEvent {
   id: string;
@@ -16,6 +17,10 @@ export interface ContactLinkEvent {
   contactValue?: string;
   linkText?: string;
   linkHref?: string;
+  formId?: string;
+  formName?: string;
+  formType?: string;
+  successSource?: string;
   urlPath?: string;
 }
 
@@ -47,6 +52,10 @@ async function relationalQuery(websiteId: string, filters: QueryFilters, limit =
       max(case when event_data.data_key = 'contactValue' then event_data.string_value end) as "contactValue",
       max(case when event_data.data_key = 'linkText' then event_data.string_value end) as "linkText",
       max(case when event_data.data_key = 'linkHref' then event_data.string_value end) as "linkHref",
+      max(case when event_data.data_key = 'formId' then event_data.string_value end) as "formId",
+      max(case when event_data.data_key = 'formName' then event_data.string_value end) as "formName",
+      max(case when event_data.data_key = 'formType' then event_data.string_value end) as "formType",
+      max(case when event_data.data_key = 'successSource' then event_data.string_value end) as "successSource",
       website_event.url_path as "urlPath"
     from website_event
     ${cohortQuery}
@@ -56,7 +65,7 @@ async function relationalQuery(websiteId: string, filters: QueryFilters, limit =
     where website_event.website_id = {{websiteId::uuid}}
       and website_event.created_at between {{startDate}} and {{endDate}}
       and website_event.event_type = 2
-      and website_event.event_name in ('${PHONE_LINK_CLICK_EVENT}', '${EMAIL_LINK_CLICK_EVENT}')
+      and website_event.event_name in ('${PHONE_LINK_CLICK_EVENT}', '${EMAIL_LINK_CLICK_EVENT}', '${CONTACT_FORM_SUBMISSION_EVENT}')
       ${filterQuery}
     group by website_event.event_id, website_event.created_at, website_event.event_name, website_event.url_path
     order by website_event.created_at desc
@@ -87,6 +96,10 @@ async function clickhouseQuery(
       maxIf(event_data.string_value, event_data.data_key = 'contactValue') as contactValue,
       maxIf(event_data.string_value, event_data.data_key = 'linkText') as linkText,
       maxIf(event_data.string_value, event_data.data_key = 'linkHref') as linkHref,
+      maxIf(event_data.string_value, event_data.data_key = 'formId') as formId,
+      maxIf(event_data.string_value, event_data.data_key = 'formName') as formName,
+      maxIf(event_data.string_value, event_data.data_key = 'formType') as formType,
+      maxIf(event_data.string_value, event_data.data_key = 'successSource') as successSource,
       website_event.url_path as urlPath
     from website_event
     ${cohortQuery}
@@ -96,7 +109,7 @@ async function clickhouseQuery(
     where website_event.website_id = {websiteId:UUID}
       and website_event.created_at between {startDate:DateTime64} and {endDate:DateTime64}
       and website_event.event_type = 2
-      and website_event.event_name in ('${PHONE_LINK_CLICK_EVENT}', '${EMAIL_LINK_CLICK_EVENT}')
+      and website_event.event_name in ('${PHONE_LINK_CLICK_EVENT}', '${EMAIL_LINK_CLICK_EVENT}', '${CONTACT_FORM_SUBMISSION_EVENT}')
       ${filterQuery}
     group by website_event.event_id, website_event.created_at, website_event.event_name, website_event.url_path
     order by website_event.created_at desc

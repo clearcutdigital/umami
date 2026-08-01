@@ -57,6 +57,17 @@ function normalizeRecipientEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function parseRecipientList(input: string) {
+  return Array.from(
+    new Set(
+      input
+        .split(/[\n,;]/)
+        .map(value => value.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
 export async function syncWebsiteMonthlyReportRecipients(websiteId: string, recipients: string[]) {
   const emails = Array.from(new Set(recipients.map(normalizeRecipientEmail).filter(Boolean)));
 
@@ -96,12 +107,31 @@ export async function getEnabledMonthlyReportRecipients(websiteId: string, recip
 
 export async function unsubscribeMonthlyReportRecipient(websiteId: string, email: string) {
   const normalizedEmail = normalizeRecipientEmail(email);
+  const report = await prisma.client.websiteMonthlyReport.findUnique({
+    where: { websiteId },
+    select: { recipients: true },
+  });
+  const remainingRecipients = report
+    ? parseRecipientList(report.recipients).filter(
+        recipient => normalizeRecipientEmail(recipient) !== normalizedEmail,
+      )
+    : [];
 
-  await prisma.client.$executeRaw(Prisma.sql`
-    insert into website_monthly_report_recipient (website_id, email, send)
-    values (${websiteId}::uuid, ${normalizedEmail}, false)
-    on conflict (website_id, email) do update set
-      send = false,
-      updated_at = now()
-  `);
+  await prisma.client.$transaction(async tx => {
+    await tx.$executeRaw(Prisma.sql`
+      delete from website_monthly_report_recipient
+      where website_id = ${websiteId}::uuid
+        and email = ${normalizedEmail}
+    `);
+
+    if (report) {
+      await tx.websiteMonthlyReport.update({
+        where: { websiteId },
+        data: {
+          recipients: remainingRecipients.join('\n'),
+          enabled: remainingRecipients.length > 0,
+        },
+      });
+    }
+  });
 }

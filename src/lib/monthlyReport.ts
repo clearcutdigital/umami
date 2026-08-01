@@ -13,6 +13,7 @@ import {
   updateWebsiteMonthlyReport,
 } from '@/queries/prisma';
 import {
+  CONTACT_FORM_SUBMISSION_EVENT,
   type ContactLinkEvent,
   EMAIL_LINK_CLICK_EVENT,
   getContactLinkEvents,
@@ -25,7 +26,7 @@ import {
 const REPORT_TIMEZONE = 'America/New_York';
 const REPORT_START_HOUR = 7;
 const REPORT_START_MINUTE = 0;
-const REPORT_SLOT_MINUTES = 10;
+const REPORT_SLOT_MINUTES = 5;
 
 function getMonthlyReportUnsubscribeSecret() {
   return process.env.MONTHLY_REPORT_UNSUBSCRIBE_SECRET || secret();
@@ -264,6 +265,10 @@ function renderSourceTextList(items: { x: string; y: number }[], totalVisitors: 
 }
 
 function getContactType(item: ContactLinkEvent) {
+  if (item.formType || item.eventName === CONTACT_FORM_SUBMISSION_EVENT) {
+    return 'form';
+  }
+
   if (item.contactType === 'phone' || item.eventName === PHONE_LINK_CLICK_EVENT) {
     return 'phone';
   }
@@ -277,7 +282,13 @@ function getContactType(item: ContactLinkEvent) {
 
 function getContactLabel(item: ContactLinkEvent) {
   const type = getContactType(item);
-  return type === 'phone' ? 'Phone' : type === 'email' ? 'Email' : 'Contact';
+  return type === 'phone'
+    ? 'Phone'
+    : type === 'email'
+      ? 'Email'
+      : type === 'form'
+        ? 'Form'
+        : 'Contact';
 }
 
 function getContactEventTime(item: ContactLinkEvent) {
@@ -303,13 +314,19 @@ function formatReportDateTime(date: Date) {
 
 function renderContactList(items: ContactLinkEvent[]) {
   if (!items.length) {
-    return '<li style="padding: 10px 0; color:#64748b;">No phone or email clicks recorded.</li>';
+    return '<li style="padding: 10px 0; color:#64748b;">No contact activity recorded.</li>';
   }
 
   return items
     .map((item, index) => {
       const label = getContactLabel(item);
-      const value = item.contactValue || item.linkText || item.linkHref || label;
+      const value =
+        item.contactValue ||
+        item.linkText ||
+        item.linkHref ||
+        item.formName ||
+        item.formType ||
+        label;
       const time = formatReportDateTime(getContactEventTime(item));
       const page = item.urlPath ? ` on ${item.urlPath}` : '';
 
@@ -328,13 +345,19 @@ function renderContactList(items: ContactLinkEvent[]) {
 
 function renderContactTextList(items: ContactLinkEvent[]) {
   if (!items.length) {
-    return '- No phone or email clicks recorded.';
+    return '- No contact activity recorded.';
   }
 
   return items
     .map(item => {
       const label = getContactLabel(item);
-      const value = item.contactValue || item.linkText || item.linkHref || label;
+      const value =
+        item.contactValue ||
+        item.linkText ||
+        item.linkHref ||
+        item.formName ||
+        item.formType ||
+        label;
       const time = formatReportDateTime(getContactEventTime(item));
       const page = item.urlPath ? ` on ${item.urlPath}` : '';
 
@@ -396,7 +419,9 @@ export async function sendWebsiteMonthlyReport(
   const contactMetrics = normalizeMetricRows(eventMetrics);
   const phoneClicks = contactMetrics.find(({ x }) => x === PHONE_LINK_CLICK_EVENT)?.y || 0;
   const emailClicks = contactMetrics.find(({ x }) => x === EMAIL_LINK_CLICK_EVENT)?.y || 0;
-  const hasContactClicks = phoneClicks > 0 || emailClicks > 0;
+  const formSubmissions =
+    contactMetrics.find(({ x }) => x === CONTACT_FORM_SUBMISSION_EVENT)?.y || 0;
+  const hasContactActivity = phoneClicks > 0 || emailClicks > 0 || formSubmissions > 0;
 
   const visits = totals.visits || 0;
   const bounceRate = visits ? Math.round((Math.min(visits, totals.bounces) / visits) * 100) : 0;
@@ -408,7 +433,7 @@ export async function sendWebsiteMonthlyReport(
   const html = `
     <div style="font-family: Inter, Arial, sans-serif; background:#f8fafc; padding:32px 16px; color:#0f172a;">
       <div style="max-width:720px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:20px; overflow:hidden; box-shadow:0 12px 30px rgba(15,23,42,0.08);">
-        <div style="padding:32px; background:linear-gradient(135deg,#0f172a,#1d4ed8); color:#ffffff;">
+        <div style="padding:32px; background:#1d4ed8; color:#ffffff;">
           <div style="font-size:12px; letter-spacing:0.12em; text-transform:uppercase; opacity:0.8;">Monthly Report</div>
           <h1 style="margin:12px 0 6px; font-size:30px; line-height:1.1;">${escapeHtml(website.name)}</h1>
           <p style="margin:0; color:rgba(255,255,255,0.8); font-size:15px;">Performance summary for ${escapeHtml(label)}</p>
@@ -422,6 +447,7 @@ export async function sendWebsiteMonthlyReport(
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Average Visit Duration</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${visitDuration}</div></div>
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Phone Clicks</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(phoneClicks)}</div></div>
             <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Email Clicks</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(emailClicks)}</div></div>
+            <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:16px; padding:16px;"><div style="font-size:12px; color:#64748b; text-transform:uppercase; letter-spacing:0.08em;">Contact Form Entries</div><div style="margin-top:8px; font-size:28px; font-weight:700;">${formatLongNumber(formSubmissions)}</div></div>
           </div>
 
           <div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
@@ -435,10 +461,10 @@ export async function sendWebsiteMonthlyReport(
           </div>
 
           ${
-            hasContactClicks
+            hasContactActivity
               ? `<div style="margin-bottom:24px; border:1px solid #e2e8f0; border-radius:18px; padding:20px; background:#ffffff;">
-            <h2 style="margin:0 0 4px; font-size:18px;">Phone &amp; Email Clicks</h2>
-            <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">These are clicks on phone and email links/buttons, not confirmed connected calls or sent emails. Showing latest ${contactEvents.length}.</p>
+            <h2 style="margin:0 0 4px; font-size:18px;">Contact Activity</h2>
+            <p style="margin:0 0 12px; color:#64748b; font-size:13px; line-height:1.5;">Phone and email link clicks plus confirmed contact-form submissions. Showing latest ${contactEvents.length}.</p>
             <ul style="list-style:none; margin:0; padding:0;">${renderContactList(contactEvents)}</ul>
           </div>`
               : ''
@@ -465,11 +491,12 @@ export async function sendWebsiteMonthlyReport(
     `Average visit duration: ${visitDuration}`,
     `Phone clicks: ${formatLongNumber(phoneClicks)}`,
     `Email clicks: ${formatLongNumber(emailClicks)}`,
+    `Contact form entries: ${formatLongNumber(formSubmissions)}`,
     '',
-    ...(hasContactClicks
+    ...(hasContactActivity
       ? [
-          'Phone & email clicks',
-          'These are clicks on phone and email links/buttons, not confirmed connected calls or sent emails.',
+          'Contact activity',
+          'Phone and email link clicks plus confirmed contact-form submissions.',
           renderContactTextList(contactEvents),
           '',
         ]
