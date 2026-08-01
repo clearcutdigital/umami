@@ -393,6 +393,15 @@ export const labels: Record<string, string> = {
   duration: 'label.duration',
   recorded: 'label.recorded',
   upgrade: 'label.upgrade',
+  apiKey: 'label.api-key',
+  fromAddress: 'label.from-address',
+  replyTo: 'label.reply-to',
+  trackOpens: 'label.track-opens',
+  trackClicks: 'label.track-clicks',
+  recipients: 'label.recipients',
+  enableMonthlyReports: 'label.enable-monthly-reports',
+  sendNow: 'label.send-now',
+  lastSent: 'label.last-sent',
 };
 
 export const messages: Record<string, string> = {
@@ -444,4 +453,5 @@ export const messages: Record<string, string> = {
   serverError: 'message.sever-error',
   upgradeRequired: 'message.upgrade-required',
   replayMinDurationDescription: 'message.replay-min-duration-description',
+  reportSent: 'message.report-sent',
 };

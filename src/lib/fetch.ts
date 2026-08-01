@@ -31,7 +31,23 @@ export async function request(
     },
     body,
   }).then(async res => {
-    const data = await res.json();
+    const contentType = res.headers.get('content-type') || '';
+    let data: any = null;
+
+    if (contentType.includes('application/json')) {
+      data = await res.json().catch(() => null);
+    } else {
+      const text = await res.text().catch(() => '');
+
+      data = res.ok
+        ? text
+        : {
+            error: {
+              status: res.status,
+              message: text || res.statusText || 'Request failed.',
+            },
+          };
+    }
 
     return {
       ok: res.ok,

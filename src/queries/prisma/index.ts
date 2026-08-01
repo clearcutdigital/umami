@@ -1,4 +1,5 @@
 export * from './board';
+export * from './emailSettings';
 export * from './link';
 export * from './pixel';
 export * from './report';
@@ -9,3 +10,4 @@ export * from './team';
 export * from './teamUser';
 export * from './user';
 export * from './website';
+export * from './websiteMonthlyReport';

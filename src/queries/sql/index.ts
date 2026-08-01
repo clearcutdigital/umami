@@ -1,4 +1,5 @@
 export * from './events/getEventDataArraySeries';
+export * from './events/getContactLinkEvents';
 export * from './events/getEventDataById';
 export * from './events/getEventDataDateSeries';
 export * from './events/getEventDataEvents';
