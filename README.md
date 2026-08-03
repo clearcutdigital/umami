@@ -12,7 +12,7 @@
   <a href="https://github.com/umami-software/umami/releases"><img src="https://img.shields.io/github/release/umami-software/umami.svg" alt="GitHub Release" /></a>
   <a href="https://github.com/umami-software/umami/blob/master/LICENSE"><img src="https://img.shields.io/github/license/umami-software/umami.svg" alt="MIT License" /></a>
   <a href="https://github.com/umami-software/umami/actions"><img src="https://img.shields.io/github/actions/workflow/status/umami-software/umami/ci.yml" alt="Build Status" /></a>
-  <a href="https://analytics.umami.is/share/LGazGOecbDtaIwDr/umami.is" style="text-decoration: none;"><img src="https://img.shields.io/badge/Try%20Demo%20Now-Click%20Here-brightgreen" alt="Umami Demo" /></a>
+  <a href="https://cloud.umami.is/share/LGazGOecbDtaIwDr/umami.is" style="text-decoration: none;"><img src="https://img.shields.io/badge/Try%20Demo%20Now-Click%20Here-brightgreen" alt="Umami Demo" /></a>
 </p>
 
 ---
@@ -48,10 +48,13 @@ DATABASE_URL=connection-url
 EMAIL_REPORTS_CRON_SECRET=change-me
 ```
 
+Optional: set `API_URL` to change the base URL used by internal UI API calls.
+Relative paths are served under `BASE_PATH`; absolute URLs are proxied through the local `/api` route.
+For example, `API_URL=/internal-api` or `API_URL=https://api.example.com/api`.
 Optional Emailit settings can be configured in the app under `Settings > Email`. The cron secret is used to secure the monthly report endpoint at `POST /api/cron/monthly-reports`.
 Monthly report unsubscribe links use `MONTHLY_REPORT_UNSUBSCRIBE_URL` when set (for example a Cloudflare Worker URL), otherwise `NEXT_PUBLIC_APP_URL`, `APP_URL`, `SITE_URL`, Netlify `URL`, `DEPLOY_URL`, or `VERCEL_URL`. Set `MONTHLY_REPORT_UNSUBSCRIBE_SECRET` to keep unsubscribe tokens stable across deploys; otherwise `APP_SECRET`/`DATABASE_URL` is used. If using the included Cloudflare Worker, set its `APP_ORIGIN` variable to this app origin.
 
-For monthly report scheduling on Netlify, hit `POST /api/cron/monthly-reports` hourly from 12:00-23:00 UTC on the first 3 days of each month with the cron secret. The app will stagger enabled websites in deterministic 10-minute slots starting at 8:00 AM `America/New_York` on the 1st of the month, and it will catch up missed slots on the next run.
+For monthly report scheduling on Netlify, hit `POST /api/cron/monthly-reports` every 20 minutes from 11:00-23:40 UTC, plus 00:00 UTC for the 8:00 PM ET run on the first 3 days of each month with the cron secret. The app will stagger enabled websites in deterministic 10-minute slots starting at 7:00 AM `America/New_York` on the 1st of the month, and it will catch up missed slots on the next run.
 
 The connection URL format:
 

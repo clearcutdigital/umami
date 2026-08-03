@@ -75,21 +75,22 @@ model Website {
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-  replayEnabled Boolean   @default(false) @map("replay_enabled")
-  replayConfig  Json?     @map("replay_config")
+  recorderEnabled Boolean @default(false) @map("recorder_enabled")
+  replayConfig    Json?   @map("replay_config")
 
-  user                User?                 @relation("user", fields: [userId], references: [id])
-  createUser          User?                 @relation("createUser", fields: [createdBy], references: [id])
-  team                Team?                 @relation(fields: [teamId], references: [id])
-  eventData           EventData[]
-  reports             Report[]
-  monthlyReport       WebsiteMonthlyReport?
+  user                    User?                           @relation("user", fields: [userId], references: [id])
+  createUser              User?                           @relation("createUser", fields: [createdBy], references: [id])
+  team                    Team?                           @relation(fields: [teamId], references: [id])
+  eventData               EventData[]
+  reports                 Report[]
+  monthlyReport           WebsiteMonthlyReport?
   monthlyReportRecipients WebsiteMonthlyReportRecipient[]
-  revenue             Revenue[]
-  segments            Segment[]
-  sessionData         SessionData[]
-  sessionReplays      SessionReplay[]
-  sessionReplaysSaved SessionReplaySaved[]
+  revenue                 Revenue[]
+  segments                Segment[]
+  sessionData             SessionData[]
+  sessionReplays          SessionReplay[]
+  sessionReplaysSaved     SessionReplaySaved[]
+  heatmapEvents           HeatmapEvent[]
 
   @@index([userId])
   @@index([teamId])
@@ -209,7 +210,7 @@ model Team {
   members  TeamUser[]
   links    Link[]
   pixels   Pixel[]
-  boards    Board[]
+  boards   Board[]
 
   @@index([accessCode])
   @@map("team")
@@ -266,14 +267,14 @@ model EmailSettings {
 }
 
 model WebsiteMonthlyReport {
-  websiteId   String    @id @map("website_id") @db.Uuid
-  enabled     Boolean   @default(false)
-  recipients  String    @db.Text
-  subject     String?   @db.VarChar(255)
-  replyTo     String?   @map("reply_to") @db.VarChar(255)
-  lastSentAt  DateTime? @map("last_sent_at") @db.Timestamptz(6)
-  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  websiteId  String    @id @map("website_id") @db.Uuid
+  enabled    Boolean   @default(false)
+  recipients String    @db.Text
+  subject    String?   @db.VarChar(255)
+  replyTo    String?   @map("reply_to") @db.VarChar(255)
+  lastSentAt DateTime? @map("last_sent_at") @db.Timestamptz(6)
+  createdAt  DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   website Website @relation(fields: [websiteId], references: [id])
 
@@ -389,6 +390,7 @@ model Board {
   @@index([createdAt])
   @@map("board")
 }
+
 model Share {
   id         String    @id() @map("share_id") @db.Uuid
   entityId   String    @map("entity_id") @db.Uuid
@@ -442,4 +444,31 @@ model SessionReplaySaved {
   @@index([visitId])
   @@index([websiteId, createdAt])
   @@map("session_replay_saved")
+}
+
+model HeatmapEvent {
+  id        String   @id() @map("heatmap_event_id") @db.Uuid
+  websiteId String   @map("website_id") @db.Uuid
+  sessionId String   @map("session_id") @db.Uuid
+  visitId   String   @map("visit_id") @db.Uuid
+  urlPath   String   @map("url_path") @db.VarChar(500)
+  eventType Int      @map("event_type") @db.Integer
+  x         Int?     @db.Integer
+  y         Int?     @db.Integer
+  pageX     Int?     @map("page_x") @db.Integer
+  pageY     Int?     @map("page_y") @db.Integer
+  pageW     Int?     @map("page_w") @db.Integer
+  viewportW Int?     @map("viewport_w") @db.Integer
+  viewportH Int?     @map("viewport_h") @db.Integer
+  pageH     Int?     @map("page_h") @db.Integer
+  scrollPct Int?     @map("scroll_pct") @db.Integer
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id])
+
+  @@index([websiteId])
+  @@index([visitId])
+  @@index([websiteId, createdAt])
+  @@index([websiteId, urlPath, eventType, createdAt])
+  @@map("heatmap_event")
 }

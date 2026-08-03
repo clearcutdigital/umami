@@ -1,5 +1,5 @@
 export const config = {
-  schedule: '0 12-23 1-3 * *',
+  schedule: '*/20 11-23 1-3 * *',
 };
 
 export default async function handler() {
@@ -24,6 +24,11 @@ export default async function handler() {
     },
   });
   const body = await response.text();
+
+  console.log('monthly-reports-cron', {
+    status: response.status,
+    body,
+  });
 
   return new Response(body, {
     status: response.status,
